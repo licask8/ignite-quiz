@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Alert, View,Text } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { GestureDetector, Gesture} from 'react-native-gesture-handler';
 import Animated, { useSharedValue, withSequence, withTiming, useAnimatedStyle, interpolate, Easing, useAnimatedScrollHandler, Extrapolate, runOnJS } from 'react-native-reanimated'
 
 import { styles } from './styles';
+import { Audio } from 'expo-av'
 
 import { QUIZ } from '../../data/quiz';
 import { historyAdd } from '../../storage/quizHistoryStorage';
@@ -58,6 +60,14 @@ export function Quiz() {
   const route = useRoute();
   const { id } = route.params as Params;
 
+  async function playSound(isCorrect: boolean) {
+    const file = isCorrect ? require('../../assets/correct.mp3') : require('../../assets/wrong.mp3');
+    const { sound } = await Audio.Sound.createAsync(file, { shouldPlay: true });
+
+    await sound.setPositionAsync(0);
+    await sound.playAsync();
+  }
+
   function handleSkipConfirm() {
     Alert.alert('Pular', 'Deseja realmente pular a questão?', [
       { text: 'Sim', onPress: () => handleNextQuestion() },
@@ -94,10 +104,13 @@ export function Quiz() {
     }
 
     if (quiz.questions[currentQuestion].correct === alternativeSelected) {
-      setStatusReply(1);
       setPoints(prevState => prevState + 1);
+
+      await playSound(true);
+      setStatusReply(1);
       handleNextQuestion();
     } else {
+      await playSound(false);
       setStatusReply(2)
       shakeAnimation();
     }
@@ -121,7 +134,9 @@ export function Quiz() {
     return true;
   }
 
-  function shakeAnimation() {
+  async function shakeAnimation() {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+
     shake.value = withSequence(
       withTiming(3, {duration: 400, easing: Easing.bounce }),
       withTiming(0, undefined, (finished) => {
